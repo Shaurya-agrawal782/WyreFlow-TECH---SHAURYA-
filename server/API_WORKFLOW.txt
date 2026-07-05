@@ -1,0 +1,292 @@
+RECRUITMENT PLATFORM BACKEND WORKFLOW WITH ADDRESSES (SECTION WISE)
+=================================================================
+
+This document explains the complete API workflow for both Jobseekers and Employers.
+Use the deployed link instead of <BASE_URL> (example: https://your-app.onrender.com/api).
+------------------------------------------------------------------------------------------
+
+NOTE - URL Adress in this workflow used LOCAL HOST/5000 as refernce part only. once you click on the above link addrss will change but end points are same like users/register/login/api/jobs this format is same and can understand to you easily.
+
+
+-----------------------------------------------------------------
+1. REGISTRATION – JOBSEEKER / EMPLOYER
+-----------------------------------------------------------------
+Method: POST
+Address: <BASE_URL>/users/register
+Body – Raw JSON:
+{
+  "name": "Hussain",
+  "email": "hussain123@gmail.com",
+  "password": "secure143",
+  "role": "job_seeker"
+}
+
+{
+  "name": "HR Recruiter",
+  "email": "recruiter@gmail.com",
+  "password": "secure777",
+  "role": "employer"
+}
+
+Response: User details + registration token.
+
+-----------------------------------------------------------------
+2. LOGIN – JOBSEEKER / EMPLOYER
+-----------------------------------------------------------------
+Method: POST
+Address: <BASE_URL>/users/login
+Body – Raw JSON:
+{
+  "email": "recruiter@gmail.com",
+  "password": "secure777"
+}
+
+{
+  "email": "hussain123@gmail.com",
+  "password": "secure143"
+}
+
+Response: User details + JWT token (save token for workflow).
+
+-----------------------------------------------------------------
+3. EMPLOYER WORKFLOW
+-----------------------------------------------------------------
+
+A) Create Job (Employer Only)
+Method: POST
+Address: <BASE_URL>/jobs
+Auth: Bearer <employer-token>
+Body:
+{
+  "title": "Full Stack Developer",
+  "description": "MERN stack developer role",
+  "requirements": "2+ years React/Node",
+  "company": "TechCorp",
+  "location": "Bangalore",
+  "salary": "70000",
+  "type": "Full-time",
+  "skills": ["react","node","mongodb","express"],
+  "industry": "FinTech"
+}
+
+Expected: 201 Created + job object.
+
+B) Get Job by ID
+Method: GET
+Address: <BASE_URL>/jobs/:jobId
+Auth: Bearer <employer-token>
+
+Expected: 200 OK + job details.
+
+C) Update Job
+Method: PATCH
+Address: <BASE_URL>/jobs/:jobId
+Auth: Bearer <employer-token>
+Body:
+{ "salary": "75000", "location": "Bengaluru" }
+
+Expected: 200 OK + updated job.
+
+D) Delete Job
+Method: DELETE
+Address: <BASE_URL>/jobs/:jobId
+Auth: Bearer <employer-token>
+
+Expected: 200 OK { "message": "Job deleted" }.
+
+E) View Applications for a Job
+Method: GET
+Address: <BASE_URL>/applications/job/:jobId
+Auth: Bearer <employer-token>
+
+Response: List of jobseekers who applied.
+
+F) Update Application Status
+Method: PATCH
+Address: <BASE_URL>/applications/:applicationId
+Auth: Bearer <employer-token>
+Body: { "status": "reviewed" }
+
+Allowed values: applied, reviewed, accepted, rejected.
+
+-----------------------------------------------------------------
+4. JOBSEEKER WORKFLOW
+-----------------------------------------------------------------
+
+A) Search Jobs
+Method: GET
+Examples:
+- <BASE_URL>/jobs?q=developer&location=bangalore&page=1&limit=5
+- <BASE_URL>/jobs?location=Bangalore
+- <BASE_URL>/jobs?skills=react,node
+- <BASE_URL>/jobs?industry=Fintech
+
+Response: List of jobs with filters/pagination.
+
+B) Apply to Job
+Method: POST
+Address: <BASE_URL>/applications/:jobId
+Auth: Bearer <jobseeker-token>
+Body (form-data):
+- coverLetter: "I am very interested in this position"
+- resume: (upload file PDF/DOC)
+
+Expected: 201 Created + application object.
+
+C) View My Applications
+Method: GET
+Address: <BASE_URL>/applications/me
+Auth: Bearer <jobseeker-token>
+
+Response: Applications + job details.
+
+D) Withdraw Application
+Method: DELETE
+Address: <BASE_URL>/applications/:applicationId
+Auth: Bearer <jobseeker-token>
+
+Response: 200 OK { "message": "Application withdrawn" }.
+
+-----------------------------------------------------------------
+5. AUTHORIZATION & ROLE-BASED ACCESS
+-----------------------------------------------------------------
+- Jobseeker tries to create job → 403 Forbidden.
+- Employer tries to update another employer’s job → 403 Forbidden.
+- Missing token → 401 Unauthorized.
+- Duplicate application → First = 201, Second = 400 Already applied.
+- Invalid jobId → 404 Job not found.
+- Employer updating application they don’t own → 403 Forbidden.
+
+-----------------------------------------------------------------
+6. DATABASE VALIDATION (MongoDB)
+-----------------------------------------------------------------
+Check collections in MongoDB Compass / Atlas:
+
+Users:
+- Passwords are hashed.
+- Role = job_seeker / employer.
+- _id matches token.
+
+Jobs:
+- Compound text index on title, description, company, location.
+- skills stored as array.
+- employer references valid user.
+
+Applications:
+- Fields: job, applicant, coverLetter, resumeUrl, resumePublicId, status.
+- Referential integrity: job + applicant exist.
+- Status enum enforced.
+
+
+7.JOB SEARCH - USING TEXT,FILTER,SKILL,INDUSTRY,PAGINATION
+--------------------------------------------------------------
+Method : GET
+Address : http://localhost:5000/api/jobs?search=react&page=1&limit=10
+
+-Click on send button in postamn it would give response adn show the posted job searched by using the required keyords and filters.
+
+-To search by location
+Address : http://localhost:5000/api/jobs?location=Bangalore
+
+-To search by industry
+Address : http://localhost:5000/api/jobs?industry=Fintech
+
+-To search by Skills
+Address - http://localhost:5000/api/jobs?skills=react,node
+
+-To search for pagination (search with page number and limit)
+Address http://localhost:5000/api/jobs?page=2&limit=5
+
+
+8.AUTHORIZATION AND ROLE BASED ACCESS (CROSS VERIFICATION OF ROLES TO ACCESS)
+--------------------------------------------------------------------------------
+
+-Try to create a job with jobSeekerToken:
+
+Method - POST
+Address - http://localhost:5000/api/jobs
+Auth - jobseeker token 
+
+Output - Expected 403 forbidden or 401 Not authorized.
+
+-Update another employer's job 
+
+Method - PATCH
+Address - http://localhost:5000/api/jobs/jobId
+
+Create job with Alice; try patch/delete with a different employer (or with jobSeekerToken). Expect 403.
+
+— Missing token
+
+Try creating job without Authorization header. Expect 401.
+
+
+
+9.APPLICATION MANAGEMENT BOUNDARY ACCESS
+----------------------------------------------
+
+-Duplicate apply prevention
+
+Mrethod -  POST 
+Adrress - http://localhost:5000/api/applications/jobId twice using jobSeekerToken.
+
+- output - First → 201. Second → 400 with message 'Already applied'.
+
+
+-Invalid jobId format
+
+Method - POST 
+Address -  http://localhost:5000/api/applications/invalid-id 
+
+-Output - Expect 400/404 and error message.
+
+
+ — Employer updating application they don't own
+
+Try to PATCH applicationId with employer who doesn't own the job → 403.
+
+
+10. DATA AND INDEX CHECKS (MONGODB)
+--------------------------------------------
+- Open Mongo Compass and verify:
+----------------------------------------
+-users collection: each user doc has hashed password, role = employer/job_seeker, _id matches Postman env.
+
+
+jobs collection:
+-------------------------------
+-Text index exists: run db.jobs.getIndexes() and confirm compound text index on title, description, company, location.
+
+-skills is an array; industry exists.
+
+-applications collection: docs contain job ObjectId, applicant ObjectId, resumeUrl, resumePublicId (if Cloudinary used), status.
+
+
+Schema edge-case checks:
+-------------------------------------
+-No plain text passwords
+
+-employer field in job references users._id
+
+-For application doc, verify referential integrity: job ObjectId exists in jobs, applicant exists in users
+
+
+
+
+-----------------------------------------------------------------
+ FULL LIFECYCLE WORKFLOW
+-----------------------------------------------------------------
+1. Jobseeker registers and logs in.
+2. Employer registers and logs in.
+3. Employer creates a job.
+4. Jobseeker searches and applies with resume.
+5. Jobseeker views "My Applications".
+6. Employer views applicants for their job.
+7. Employer updates application status (reviewed / accepted / rejected).
+8. Jobseeker withdraws application.
+9. Database checked for indexes, integrity, and security.
+
+-----------------------------------------------------------------
+SUMMARY
+-----------------------------------------------------------------
+This backend implements a real hiring lifecycle with secure authentication, role-based access, job management, and application workflow. Resumes are uploaded to Cloudinary, and all data is stored in MongoDB Atlas with indexes for search and validation.
